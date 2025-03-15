@@ -11,10 +11,10 @@ header {
 
 /* 100px × 4 + 5px × 3 = 415px */
 #grid {
+  width: 90vw;   /* ビューポート幅の90% */
+  height: 90vw; /* 正方形 */
+  margin: 10px auto;
   position: relative;
-  width: 415px;
-  height: 415px;
-  margin: 20px auto;
 }
 
 .tile {
@@ -81,11 +81,15 @@ header {
   display: none;
 }
 .modal-content {
-  background: white;
+  width: 90vw;       /* 画面幅の9割 */
+  max-width: 400px;  /* 大きい画面では最大400px */
+  max-height: 90vh;  /* 縦に入り切らない場合にスクロール */
+  overflow-y: auto;
+
+  background: #fff;
   padding: 20px;
   border-radius: 5px;
   text-align: left;
-  width: 600px; /* 幅を増やして左右配置しやすく */
 }
 
 .row {
