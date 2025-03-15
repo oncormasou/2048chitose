@@ -170,6 +170,14 @@ function addRandomTile() {
 /***** タイルのUI更新 *****/
 function updateGridUI() {
   const tiles = document.querySelectorAll(".tile");
+
+  // ① #grid の幅から、タイル1個あたりの幅を動的に計算
+  const gridWidth = gridElement.offsetWidth;   // #grid の実際の描画幅(px)
+  const gap = 5;                               // タイル間の隙間(px)
+  const totalGap = gap * (gridSize - 1);       // （4×4の場合、隙間が3つある）
+  const tileWidth = (gridWidth - totalGap) / gridSize;
+  // 例：#grid が 400px 幅なら、(400 - 5*3)/4 = 96.25 px
+
   tiles.forEach((tile, index) => {
     const row = Math.floor(index / gridSize);
     const col = index % gridSize;
@@ -178,9 +186,16 @@ function updateGridUI() {
     const imgEl = tile.querySelector("img");
     const span = tile.querySelector("span");
 
-    // タイル配置 (100px + 5px隙間 = 105px単位)
-    tile.style.transform = `translate(${col * 105}px, ${row * 105}px)`;
+    // ② タイルの width/height を計算結果に合わせる
+    tile.style.width = tileWidth + "px";
+    tile.style.height = tileWidth + "px";
 
+    // ③ タイルを translate で配置 (X, Y = (タイル幅+隙間) × 列/行番号)
+    const x = col * (tileWidth + gap);
+    const y = row * (tileWidth + gap);
+    tile.style.transform = `translate(${x}px, ${y}px)`;
+
+    // ④ タイルの表示 (数値や画像) は従来どおり
     if (value > 0) {
       span.textContent = value;
       if (tileImages[value]) {
