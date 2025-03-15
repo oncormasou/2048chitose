@@ -50,14 +50,25 @@ const tilePreview = document.getElementById("tile-preview");
 
 let cropper; // Cropperインスタンスを格納
 
-document.addEventListener("touchstart", (e) => {
+gridElement.addEventListener("touchstart", (e) => {
+  // 既定のスクロールを止める
+  e.preventDefault();
+
+  // 端末によってはマルチタッチをすることがあるので、touches[0]を確認
   if (e.touches.length > 0) {
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
   }
-});
+}, { passive: false }); 
+// ↑ passive: false を指定しないと preventDefault() が無視されることがある
 
-document.addEventListener("touchend", (e) => {
+// touchmove: スワイプ途中のスクロールも防ぐ
+gridElement.addEventListener("touchmove", (e) => {
+  e.preventDefault();
+}, { passive: false });
+
+// touchend: 指を離したときにスワイプ方向を判定
+gridElement.addEventListener("touchend", (e) => {
   if (e.changedTouches.length > 0) {
     const touchEndX = e.changedTouches[0].clientX;
     const touchEndY = e.changedTouches[0].clientY;
@@ -65,22 +76,22 @@ document.addEventListener("touchend", (e) => {
     const dx = touchEndX - touchStartX;
     const dy = touchEndY - touchStartY;
 
-    // スワイプの閾値(距離)を適度に決める (例: 30px)
+    // スワイプの閾値
     const threshold = 30;
 
+    // 横方向に大きく移動
     if (Math.abs(dx) > Math.abs(dy)) {
-      // 横方向の移動が大きい
       if (dx > threshold) {
-        slide("right"); // 右スワイプ
+        slide("right");
       } else if (dx < -threshold) {
-        slide("left"); // 左スワイプ
+        slide("left");
       }
     } else {
-      // 縦方向の移動が大きい
+      // 縦方向に大きく移動
       if (dy > threshold) {
-        slide("down"); // 下スワイプ
+        slide("down");
       } else if (dy < -threshold) {
-        slide("up"); // 上スワイプ
+        slide("up");
       }
     }
   }
