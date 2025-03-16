@@ -312,23 +312,37 @@ function slide(direction) {
       if (!arraysEqual(currentRow, newRow)) moved = true;
       grid[r] = newRow;
     }
-  } else if (direction === "up" || direction === "down") {
-    for (let c = 0; c < gridSize; c++) {
-      const currentCol = grid.map((row) => row[c]);
-      let { newRow: newCol, merges } = slideRowLeftWithMerges(currentCol);
-      if (direction === "down") {
-        newCol = newCol.reverse();
-        merges = merges.map((idx) => gridSize - 1 - idx);
-      }
-      merges.forEach((rowIndex) => {
-        mergedPositions.push({ row: rowIndex, col: c });
-      });
-      newCol.forEach((val, r) => {
-        if (grid[r][c] !== val) moved = true;
-        grid[r][c] = val;
-      });
+} else if (direction === "up" || direction === "down") {
+  for (let c = 0; c < gridSize; c++) {
+    const currentCol = grid.map(row => row[c]);
+    // slideRowLeftWithMerges は常に左寄せ（＝上寄せ）の結果を返すので、
+    // ここでは merge の結果と、非ゼロ要素のみを抽出する
+    let { newRow: mergedCol, merges } = slideRowLeftWithMerges(currentCol);
+    // ここで mergedCol は上寄せになっている（例: [2,4,0,0]）
+    const nonZero = mergedCol.filter(val => val !== 0);
+    let newCol;
+    if (direction === "down") {
+      // 下方向の場合：非ゼロ部分をそのまま下に寄せるには、先頭に必要な数の 0 を追加する
+      newCol = Array(gridSize - nonZero.length).fill(0).concat(nonZero);
+      // 合体位置も、非ゼロ部分が移動した分、オフセットを加える
+      merges = merges.map(idx => idx + (gridSize - nonZero.length));
+    } else {
+      // 上方向の場合：非ゼロ部分を上に寄せる（末尾に 0 を追加）
+      newCol = nonZero.concat(Array(gridSize - nonZero.length).fill(0));
     }
+    // 合体位置の記録
+    merges.forEach(rowIndex => {
+      mergedPositions.push({ row: rowIndex, col: c });
+    });
+    // 新しい列の内容で grid を更新
+    newCol.forEach((val, r) => {
+      if (grid[r][c] !== val) moved = true;
+      grid[r][c] = val;
+    });
   }
+}
+
+
 
   if (moved) {
     addRandomTile();
