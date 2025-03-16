@@ -163,7 +163,7 @@ function addRandomTile() {
   }
   if (emptyCells.length > 0) {
     const { row, col } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-    grid[row][col] = Math.random() < 0.8 ? 2 : 4;
+    grid[row][col] = Math.random() < 0.82 ? 2 : 4;
   }
 }
 
