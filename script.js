@@ -26,6 +26,9 @@ let defaultTileColors = {
 let touchStartX = 0;
 let touchStartY = 0;
 
+/** 合体したタイルの位置を記録する配列 */
+let mergedPositions = [];
+
 /***** HTML要素の取得 *****/
 const gridElement = document.getElementById("grid");
 const scoreElement = document.getElementById("score");
@@ -50,24 +53,19 @@ const tilePreview = document.getElementById("tile-preview");
 
 let cropper; // Cropperインスタンスを格納
 
+/***** タッチイベント *****/
 gridElement.addEventListener("touchstart", (e) => {
-  // 既定のスクロールを止める
   e.preventDefault();
-
-  // 端末によってはマルチタッチをすることがあるので、touches[0]を確認
   if (e.touches.length > 0) {
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
   }
-}, { passive: false }); 
-// ↑ passive: false を指定しないと preventDefault() が無視されることがある
+}, { passive: false });
 
-// touchmove: スワイプ途中のスクロールも防ぐ
 gridElement.addEventListener("touchmove", (e) => {
   e.preventDefault();
 }, { passive: false });
 
-// touchend: 指を離したときにスワイプ方向を判定
 gridElement.addEventListener("touchend", (e) => {
   if (e.changedTouches.length > 0) {
     const touchEndX = e.changedTouches[0].clientX;
@@ -75,11 +73,8 @@ gridElement.addEventListener("touchend", (e) => {
 
     const dx = touchEndX - touchStartX;
     const dy = touchEndY - touchStartY;
-
-    // スワイプの閾値
     const threshold = 30;
 
-    // 横方向に大きく移動
     if (Math.abs(dx) > Math.abs(dy)) {
       if (dx > threshold) {
         slide("right");
@@ -87,7 +82,6 @@ gridElement.addEventListener("touchend", (e) => {
         slide("left");
       }
     } else {
-      // 縦方向に大きく移動
       if (dy > threshold) {
         slide("down");
       } else if (dy < -threshold) {
@@ -96,7 +90,6 @@ gridElement.addEventListener("touchend", (e) => {
     }
   }
 });
-
 
 /***** ゲーム初期化 *****/
 function initializeGame() {
@@ -113,14 +106,21 @@ function initializeGrid() {
   gridElement.innerHTML = "";
   gameOverElement.classList.add("hidden");
 
-  // タイルのDOM生成
+  // タイルのDOM生成（.tile-contentでラップ）
   for (let i = 0; i < gridSize * gridSize; i++) {
     const tile = document.createElement("div");
     tile.classList.add("tile");
+
+    const content = document.createElement("div");
+    content.classList.add("tile-content");
+
     const imgEl = document.createElement("img");
     const span = document.createElement("span");
-    tile.appendChild(imgEl);
-    tile.appendChild(span);
+
+    content.appendChild(imgEl);
+    content.appendChild(span);
+    tile.appendChild(content);
+
     gridElement.appendChild(tile);
   }
 
@@ -163,39 +163,37 @@ function addRandomTile() {
   }
   if (emptyCells.length > 0) {
     const { row, col } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
-    grid[row][col] = Math.random() < 0.8 ? 2 : 4; // 4の出現確率20%
+    grid[row][col] = Math.random() < 0.8 ? 2 : 4;
   }
 }
 
 /***** タイルのUI更新 *****/
 function updateGridUI() {
   const tiles = document.querySelectorAll(".tile");
-
-  // ① #grid の幅から、タイル1個あたりの幅を動的に計算
-  const gridWidth = gridElement.offsetWidth;   // #grid の実際の描画幅(px)
-  const gap = 5;                               // タイル間の隙間(px)
-  const totalGap = gap * (gridSize - 1);       // （4×4の場合、隙間が3つある）
+  const gridWidth = gridElement.offsetWidth;
+  const gap = 5;
+  const totalGap = gap * (gridSize - 1);
   const tileWidth = (gridWidth - totalGap) / gridSize;
-  // 例：#grid が 400px 幅なら、(400 - 5*3)/4 = 96.25 px
-
+  
+  // ① まず各タイルのサイズ・内容・初期位置を更新（transition は無効）
   tiles.forEach((tile, index) => {
-    const row = Math.floor(index / gridSize);
-    const col = index % gridSize;
-    const value = grid[row][col];
-
-    const imgEl = tile.querySelector("img");
-    const span = tile.querySelector("span");
-
-    // ② タイルの width/height を計算結果に合わせる
+    
     tile.style.width = tileWidth + "px";
     tile.style.height = tileWidth + "px";
-
-    // ③ タイルを translate で配置 (X, Y = (タイル幅+隙間) × 列/行番号)
+    
+    const row = Math.floor(index / gridSize);
+    const col = index % gridSize;
     const x = col * (tileWidth + gap);
     const y = row * (tileWidth + gap);
+    const transformValue = `translate(${x}px, ${y}px)`;
     tile.style.transform = `translate(${x}px, ${y}px)`;
-
-    // ④ タイルの表示 (数値や画像) は従来どおり
+    tile.style.transform = transformValue;
+     console.log(`Tile ${index} -> ${transformValue}`);
+    // タイルの内容更新
+    const value = grid[row][col];
+    const imgEl = tile.querySelector("img");
+    const span = tile.querySelector("span");
+    
     if (value > 0) {
       span.textContent = value;
       if (tileImages[value]) {
@@ -212,35 +210,48 @@ function updateGridUI() {
       tile.style.backgroundColor = "lightgray";
     }
   });
-}
-
-function updateTilePreview(tileValue) {
-  const customImage = tileImages[tileValue];
-  // 数値をテキストとして表示
-  tilePreview.textContent = tileValue;
-
-  if (customImage) {
-    // カスタム画像を使う
-    tilePreview.style.backgroundImage = `url(${customImage})`;
-    tilePreview.style.backgroundSize = "cover";
-    tilePreview.style.backgroundColor = "transparent";
-  } else {
-    // デフォルト色で塗りつぶす
-    tilePreview.style.backgroundImage = "";
-    tilePreview.style.backgroundColor = defaultTileColors[tileValue] || "#CCC";
-  }
+  
+  // ② 次のフレームで transition を有効にして再度 transform をセット
+  requestAnimationFrame(() => {
+    tiles.forEach((tile, index) => {
+      
+      const row = Math.floor(index / gridSize);
+      const col = index % gridSize;
+      const x = col * (tileWidth + gap);
+      const y = row * (tileWidth + gap);
+      tile.style.transform = `translate(${x}px, ${y}px)`;
+    });
+  });
 }
 
 
+
+
+
+/***** 合体アニメーションの実行 *****/
+function animateMergedTiles() {
+  mergedPositions.forEach(({ row, col }) => {
+    const index = row * gridSize + col;
+    const tile = gridElement.children[index];
+    const content = tile.querySelector(".tile-content");
+    if (content) {
+      content.classList.add("pop");
+      setTimeout(() => {
+        content.classList.remove("pop");
+      }, 300);
+    }
+  });
+  mergedPositions = [];
+}
+
+/***** 補助関数 *****/
 function getTileColor(value) {
   return defaultTileColors[value] || "#CCC";
 }
 
-/***** スコア更新 *****/
 function updateScore(newPoints) {
   score += newPoints;
   scoreElement.textContent = score;
-
   if (score > highScore) {
     highScore = score;
     highScoreElement.textContent = highScore;
@@ -248,27 +259,70 @@ function updateScore(newPoints) {
   }
 }
 
+function arraysEqual(a, b) {
+  return a.length === b.length && a.every((val, i) => val === b[i]);
+}
+
+/***** 合体を記録可能なスライド処理（左方向） *****/
+function slideRowLeftWithMerges(row) {
+  const nonZeroTiles = row.filter((v) => v !== 0);
+  const newRow = [];
+  const merges = [];
+  let skip = false;
+  let currentIndex = 0;
+  for (let i = 0; i < nonZeroTiles.length; i++) {
+    if (skip) {
+      skip = false;
+      continue;
+    }
+    if (nonZeroTiles[i] === nonZeroTiles[i + 1]) {
+      const mergedValue = nonZeroTiles[i] * 2;
+      newRow.push(mergedValue);
+      merges.push(currentIndex);
+      updateScore(mergedValue);
+      skip = true;
+      currentIndex++;
+    } else {
+      newRow.push(nonZeroTiles[i]);
+      currentIndex++;
+    }
+  }
+  while (newRow.length < gridSize) {
+    newRow.push(0);
+  }
+  return { newRow, merges };
+}
+
 /***** スライド (上下左右) *****/
 function slide(direction) {
   let moved = false;
-
+  console.log("beforegrid:", JSON.stringify(grid));
   if (direction === "left" || direction === "right") {
     for (let r = 0; r < gridSize; r++) {
       const currentRow = grid[r].slice();
-      const newRow =
-        direction === "left"
-          ? slideRowLeft(currentRow)
-          : slideRowLeft(currentRow.reverse()).reverse();
+      let { newRow, merges } = slideRowLeftWithMerges(currentRow);
+      if (direction === "right") {
+        newRow = newRow.reverse();
+        merges = merges.map((idx) => gridSize - 1 - idx);
+      }
+      // 記録: この行のどの列で合体が発生したか
+      merges.forEach((col) => {
+        mergedPositions.push({ row: r, col: col });
+      });
       if (!arraysEqual(currentRow, newRow)) moved = true;
       grid[r] = newRow;
     }
   } else if (direction === "up" || direction === "down") {
     for (let c = 0; c < gridSize; c++) {
       const currentCol = grid.map((row) => row[c]);
-      const newCol =
-        direction === "up"
-          ? slideRowLeft(currentCol)
-          : slideRowLeft(currentCol.reverse()).reverse();
+      let { newRow: newCol, merges } = slideRowLeftWithMerges(currentCol);
+      if (direction === "down") {
+        newCol = newCol.reverse();
+        merges = merges.map((idx) => gridSize - 1 - idx);
+      }
+      merges.forEach((rowIndex) => {
+        mergedPositions.push({ row: rowIndex, col: c });
+      });
       newCol.forEach((val, r) => {
         if (grid[r][c] !== val) moved = true;
         grid[r][c] = val;
@@ -279,37 +333,13 @@ function slide(direction) {
   if (moved) {
     addRandomTile();
     updateGridUI();
+     console.log("aftergrid:", JSON.stringify(grid));
+    animateMergedTiles();
   }
 
-  // 移動の有無に関わらずゲームオーバー判定
   if (checkGameOver()) {
     gameOverElement.classList.remove("hidden");
   }
-}
-
-function slideRowLeft(row) {
-  const nonZeroTiles = row.filter((v) => v !== 0);
-  const newRow = [];
-  let skip = false;
-
-  for (let i = 0; i < nonZeroTiles.length; i++) {
-    if (skip) {
-      skip = false;
-      continue;
-    }
-    if (nonZeroTiles[i] === nonZeroTiles[i + 1]) {
-      const mergedValue = nonZeroTiles[i] * 2;
-      newRow.push(mergedValue);
-      updateScore(mergedValue);
-      skip = true;
-    } else {
-      newRow.push(nonZeroTiles[i]);
-    }
-  }
-  while (newRow.length < gridSize) {
-    newRow.push(0);
-  }
-  return newRow;
 }
 
 /***** ゲームオーバー判定 *****/
@@ -317,7 +347,6 @@ function checkGameOver() {
   for (let r = 0; r < gridSize; r++) {
     for (let c = 0; c < gridSize; c++) {
       if (grid[r][c] === 0) return false;
-      // 隣接タイル同士で合体可能ならまだ
       if (c < gridSize - 1 && grid[r][c] === grid[r][c + 1]) return false;
       if (r < gridSize - 1 && grid[r][c] === grid[r + 1][c]) return false;
     }
@@ -325,48 +354,32 @@ function checkGameOver() {
   return true;
 }
 
-function arraysEqual(a, b) {
-  return a.length === b.length && a.every((val, i) => val === b[i]);
-}
-
 /***** イベント設定 *****/
-
-/** Customizeボタン: モーダルを開く */
 customizeButton.addEventListener("click", () => {
-  // セレクターをデフォルト(2)に戻すなど必要に応じて
   tileSelector.value = "2";
   updateTilePreview(tileSelector.value);
-
-  // Cropperの初期化・リセット
   resetCropper();
-
   customizeModal.classList.remove("hidden");
 });
 
-/** Tileセレクターが切り替わったらプレビュー更新 */
 tileSelector.addEventListener("change", () => {
   updateTilePreview(tileSelector.value);
   resetCropper();
 });
 
-/** Closeボタン: モーダルを閉じる */
 closeModalButton.addEventListener("click", () => {
   customizeModal.classList.add("hidden");
 });
 
-/** 画像アップロード: Cropperを初期化 */
 uploadImage.addEventListener("change", (event) => {
   if (!event.target.files || !event.target.files.length) return;
-
   const file = event.target.files[0];
   const reader = new FileReader();
-
   reader.onload = () => {
     cropContainer.innerHTML = "";
     const img = document.createElement("img");
     img.src = reader.result;
     cropContainer.appendChild(img);
-
     if (cropper) {
       cropper.destroy();
     }
@@ -378,32 +391,22 @@ uploadImage.addEventListener("change", (event) => {
   reader.readAsDataURL(file);
 });
 
-/** Applyボタン: トリミング結果を保存 */
 applyButton.addEventListener("click", () => {
   if (cropper) {
-    // 100x100にトリミングした画像を取得
-     const dpr = window.devicePixelRatio || 1;
-        const canvas = cropper.getCroppedCanvas({
+    const dpr = window.devicePixelRatio || 1;
+    const canvas = cropper.getCroppedCanvas({
       width: 100 * dpr,
       height: 100 * dpr
     });
     const croppedImage = canvas.toDataURL("image/png");
-
     const tileValue = tileSelector.value;
     tileImages[tileValue] = croppedImage;
-
     saveTileImages();
     updateGridUI();
-
-    // プレビュー更新
     updateTilePreview(tileValue);
   }
 });
 
-
-
-
-/** Reset This Tileボタン: 選択中のタイル画像を削除 */
 resetSelectedTileButton.addEventListener("click", () => {
   const tileValue = tileSelector.value;
   if (tileImages[tileValue]) {
@@ -414,22 +417,15 @@ resetSelectedTileButton.addEventListener("click", () => {
   }
 });
 
-/** Reset All Tilesボタン: すべてのタイル画像を削除 */
 resetAllTileButton.addEventListener("click", () => {
-  // tileImagesを空オブジェクトにして保存
   tileImages = {};
   saveTileImages();
-
-  // UI更新
   updateGridUI();
-  // 今の選択タイルプレビューもクリア
   updateTilePreview(tileSelector.value);
 });
 
-/** Resetボタン: ゲームそのものを再初期化 (スコアや盤面リセット) */
 resetButton.addEventListener("click", initializeGrid);
 
-/** キー入力: 2048操作 (上下左右) */
 document.addEventListener("keydown", (event) => {
   switch (event.key) {
     case "ArrowUp":
@@ -452,7 +448,6 @@ function updateTilePreview(tileValue) {
   if (tileImages[tileValue]) {
     tilePreview.src = tileImages[tileValue];
   } else {
-    // カスタム画像が無い場合は空にする(またはデフォルト画像でもOK)
     tilePreview.src = "";
   }
 }
